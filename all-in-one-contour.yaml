@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: envoy-authz-java
+  name: envoy-authz-java
+  namespace: envoy-yang
+spec:
+  selector:
+    matchLabels:
+      app: envoy-authz-java
+  template:
+    metadata:
+      labels:
+        app: envoy-authz-java
+    spec:
+      containers:
+        - image: release-ci.daocloud.io/skoala/demo/envoy-authz-java:0.1.0
+          imagePullPolicy: IfNotPresent
+          name: envoy-authz-java
+          ports:
+            - containerPort: 18081
+              name: grpc
+              protocol: TCP
+      restartPolicy: Always
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: envoy-authz-java
+  namespace: envoy-yang
+  labels:
+    app: envoy-authz-java
+spec:
+  type: NodePort
+  ports:
+    - port: 18081
+      targetPort: grpc
+      protocol: TCP
+      name: grpc
+  selector:
+    app: envoy-authz-java
+
+---
+#auth策略扩展服务
+apiVersion: projectcontour.io/v1alpha1
+kind: ExtensionService
+metadata:
+  name: envoy-authz-java
+  namespace: envoy-yang
+spec:
+  loadBalancerPolicy:
+    strategy: WeightedLeastRequest
+  protocol: h2c
+  timeoutPolicy:
+    response: 10s
+  services:
+    - name: envoy-authz-java
+      port: 18081
